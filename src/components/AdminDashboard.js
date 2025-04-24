@@ -73,7 +73,7 @@ export default function AdminDashboard() {
       >
         <Toolbar />
         <List>
-          {['Products', 'Orders', 'Statistics', 'Sellers'].map((text) => (
+          {['Products', 'Orders', 'Category', 'Sellers'].map((text) => (
             <ListItem button key={text}>
               <ListItemText primary={text} />
             </ListItem>
@@ -104,14 +104,14 @@ export default function AdminDashboard() {
         </Grid>
 
         {/* Status Section */}
-        <Paper style={styles.statusSection}>
+        {/* <Paper style={styles.statusSection}>
           <Typography variant="h6" gutterBottom>
             Status
           </Typography>
           <Typography variant="body1">
             Category: Last added
           </Typography>
-        </Paper>
+        </Paper> */}
       </main>
     </div>
   );

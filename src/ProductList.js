@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
   Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Paper, TextField, Dialog, DialogTitle, DialogContent, DialogActions
+  Paper, TextField, Dialog, DialogTitle, DialogContent, DialogActions, Pagination
 } from '@mui/material';
 
 export default function ProductList() {
@@ -14,35 +14,63 @@ export default function ProductList() {
     description: '',
     price: '',
     stock: '',
+    image: null,
+    image_url: '',
   });
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const rowsPerPage = 5;
 
   useEffect(() => {
     fetchProducts();
   }, []);
 
   const fetchProducts = async () => {
-    const res = await axios.get('http://127.0.0.1:8000/api/products');
-    setProducts(res.data);
+    try {
+      const res = await axios.get('http://127.0.0.1:8000/api/products');
+      setProducts(res.data);
+    } catch (err) {
+      console.error('Fetch error:', err);
+    }
   };
+
   axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  const handleFileChange = (e) => {
+    setForm({ ...form, image: e.target.files[0] });
+  };
+
   const handleAddOrUpdate = async () => {
-    if (editId) {
-      // Update existing product
-      await axios.post(`http://127.0.0.1:8000/api/products/${editId}`, {
-        ...form,
-        _method: 'PUT',
-      });
-    } else {
-      // Create new product
-      await axios.post('http://127.0.0.1:8000/api/products', form);
+    const formData = new FormData();
+    formData.append('name', form.name);
+    formData.append('description', form.description);
+    formData.append('price', form.price);
+    formData.append('stock', form.stock);
+    if (form.image) {
+      formData.append('image', form.image);
     }
-    fetchProducts();
-    handleClose();
+
+    try {
+      if (editId) {
+        formData.append('_method', 'PUT');
+        await axios.post(`http://127.0.0.1:8000/api/products/${editId}`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+      } else {
+        await axios.post('http://127.0.0.1:8000/api/products', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+      }
+
+      fetchProducts();
+      handleClose();
+    } catch (err) {
+      console.error('Submit error:', err);
+    }
   };
 
   const handleEdit = (product) => {
@@ -52,6 +80,8 @@ export default function ProductList() {
       description: product.description,
       price: product.price,
       stock: product.stock,
+      image: null,
+      image_url: product.image_url,
     });
     setOpen(true);
   };
@@ -64,24 +94,46 @@ export default function ProductList() {
         });
         fetchProducts();
       } catch (err) {
-        console.error(err);
+        console.error('Delete error:', err);
         alert('Failed to delete product.');
       }
     }
   };
-  
 
   const handleOpen = () => {
     setEditId(null);
-    setForm({ name: '', description: '', price: '', stock: '' });
+    setForm({
+      name: '',
+      description: '',
+      price: '',
+      stock: '',
+      image: null,
+      image_url: '',
+    });
     setOpen(true);
   };
 
   const handleClose = () => {
     setOpen(false);
     setEditId(null);
-    setForm({ name: '', description: '', price: '', stock: '' });
+    setForm({
+      name: '',
+      description: '',
+      price: '',
+      stock: '',
+      image: null,
+      image_url: '',
+    });
   };
+
+  const handlePageChange = (event, value) => {
+    setCurrentPage(value);
+  };
+
+  const paginatedProducts = products.slice(
+    (currentPage - 1) * rowsPerPage,
+    currentPage * rowsPerPage
+  );
 
   return (
     <div>
@@ -89,26 +141,36 @@ export default function ProductList() {
         Add Product
       </Button>
 
-      {/* Table Display */}
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
             <TableRow>
+              <TableCell>Image</TableCell>
               <TableCell>Name</TableCell>
               <TableCell>Description</TableCell>
               <TableCell>Price</TableCell>
-              <TableCell>Stock</TableCell>
+              <TableCell>Discount</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {products.map((product) => (
+            {paginatedProducts.map((product) => (
               <TableRow key={product.id}>
+                <TableCell>
+                  {product.image_url && (
+                    <img
+                      src={product.image_url}
+                      alt="product"
+                      width="50"
+                      height="50"
+                      style={{ objectFit: 'cover', borderRadius: 4 }}
+                    />
+                  )}
+                </TableCell>
                 <TableCell>{product.name}</TableCell>
                 <TableCell>{product.description}</TableCell>
                 <TableCell>${product.price}</TableCell>
                 <TableCell>{product.stock}</TableCell>
-                
                 <TableCell>
                   <Button color="primary" onClick={() => handleEdit(product)}>Edit</Button>
                   <Button color="error" onClick={() => handleDelete(product.id)}>Delete</Button>
@@ -119,7 +181,14 @@ export default function ProductList() {
         </Table>
       </TableContainer>
 
-      {/* Dialog for Add/Edit */}
+      <Pagination
+        count={Math.ceil(products.length / rowsPerPage)}
+        page={currentPage}
+        onChange={handlePageChange}
+        color="primary"
+        style={{ marginTop: 16, display: 'flex', justifyContent: 'center' }}
+      />
+
       <Dialog open={open} onClose={handleClose}>
         <DialogTitle>{editId ? 'Edit Product' : 'Add Product'}</DialogTitle>
         <DialogContent>
@@ -158,6 +227,17 @@ export default function ProductList() {
             value={form.stock}
             onChange={handleChange}
           />
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            style={{ marginTop: 16 }}
+          />
+          {editId && form.image_url && (
+            <div style={{ marginTop: 10 }}>
+              <img src={form.image_url} alt="Preview" height="80" />
+            </div>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={handleClose}>Cancel</Button>
